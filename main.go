@@ -37,7 +37,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 		Uptime:    time.Since(startTime).String(),
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("failed to encode health response: %v", err)
 	}
@@ -50,13 +50,14 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 		MemoryAlloc: "minimal",
 		Status:      "operational",
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("failed to encode metrics response: %v", err)
 	}
 }
 
-func main() {
+// setupServer constructs and configures the HTTP server instance for testing
+func setupServer() (*http.Server, string) {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -74,8 +75,6 @@ func main() {
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/metrics", metricsHandler)
 
-	log.Printf("🚀 Go Gateway starting on port %s...", safePort)
-
 	// Configure server with explicit timeouts to prevent G114
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%s", safePort),
@@ -85,6 +84,13 @@ func main() {
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+
+	return server, safePort
+}
+
+func main() {
+	server, safePort := setupServer()
+	log.Printf("🚀 Go Gateway starting on port %s...", safePort)
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server failed to start: %v", err)
