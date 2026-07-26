@@ -1,16 +1,19 @@
+cat << 'EOF' > .github/workflows/deploy.yml
 name: CI/CD Pipeline - Deploy to Cloud Run
 
 on:
   push:
     branches:
       - main
+      - master
   pull_request:
     branches:
       - main
+      - master
 
 jobs:
   test-and-build:
-    name: Run Tests & Build Check
+    name: Run Tests, Security Scan & Build Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -19,15 +22,20 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.26'
 
       - name: Run Unit Tests
         run: go test -v -cover ./...
 
+      - name: Run GoSec Security Scan
+        uses: securego/gosec@master
+        with:
+          args: ./...
+
   deploy:
     name: Build & Deploy to Environment
     needs: test-and-build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
     runs-on: ubuntu-latest
 
     permissions:
@@ -42,28 +50,29 @@ jobs:
         id: env-config
         run: |
           REPO_NAME="${{ github.event.repository.name }}"
-          
+          PROJECT_ID="phx-platform-lab"
+
           if [[ "$REPO_NAME" == *"_dev" ]]; then
             echo "SERVICE_NAME=go-gateway-dev" >> $GITHUB_ENV
-            echo "WIF_PROVIDER=projects/265237128712/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> $GITHUB_ENV
-            echo "SA_EMAIL=github-actions-sa@capstone-dev-sb26.iam.gserviceaccount.com" >> $GITHUB_ENV
-            echo "REGISTRY=us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo" >> $GITHUB_ENV
-            echo "RUN_PROJECT=capstone-dev-sb26" >> $GITHUB_ENV
-            
+            echo "WIF_PROVIDER=projects/22197185798/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider" >> $GITHUB_ENV
+            echo "SA_EMAIL=sa-capstone-dev@${PROJECT_ID}.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "REGISTRY=us-central1-docker.pkg.dev/${PROJECT_ID}/platform-repo" >> $GITHUB_ENV
+            echo "RUN_PROJECT=${PROJECT_ID}" >> $GITHUB_ENV
+
           elif [[ "$REPO_NAME" == *"_staging" ]]; then
             echo "SERVICE_NAME=go-gateway-staging" >> $GITHUB_ENV
-            echo "WIF_PROVIDER=projects/265237128712/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> $GITHUB_ENV
-            echo "SA_EMAIL=github-actions-sa@capstone-dev-sb26.iam.gserviceaccount.com" >> $GITHUB_ENV
-            echo "REGISTRY=us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo" >> $GITHUB_ENV
-            echo "RUN_PROJECT=capstone-dev-sb26" >> $GITHUB_ENV
-            
+            echo "WIF_PROVIDER=projects/22197185798/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider" >> $GITHUB_ENV
+            echo "SA_EMAIL=sa-capstone-staging@${PROJECT_ID}.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "REGISTRY=us-central1-docker.pkg.dev/${PROJECT_ID}/platform-repo" >> $GITHUB_ENV
+            echo "RUN_PROJECT=${PROJECT_ID}" >> $GITHUB_ENV
+
           elif [[ "$REPO_NAME" == *"_production" ]]; then
             echo "SERVICE_NAME=go-gateway-prod" >> $GITHUB_ENV
-            echo "WIF_PROVIDER=projects/1076538183807/locations/global/workloadIdentityPools/shared-github-pool/providers/shared-github-provider" >> $GITHUB_ENV
-            echo "SA_EMAIL=shared-ci-sa@capstone-shared-sb26.iam.gserviceaccount.com" >> $GITHUB_ENV
-            echo "REGISTRY=us-central1-docker.pkg.dev/capstone-shared-sb26/platform-repo" >> $GITHUB_ENV
-            echo "RUN_PROJECT=capstone-prod-sb26" >> $GITHUB_ENV
-            
+            echo "WIF_PROVIDER=projects/22197185798/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider" >> $GITHUB_ENV
+            echo "SA_EMAIL=sa-capstone-prod@${PROJECT_ID}.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "REGISTRY=us-central1-docker.pkg.dev/${PROJECT_ID}/platform-repo" >> $GITHUB_ENV
+            echo "RUN_PROJECT=${PROJECT_ID}" >> $GITHUB_ENV
+
           else
             echo "Error: Unrecognized repository name ($REPO_NAME). Must end in _dev, _staging, or _production"
             exit 1
@@ -98,3 +107,4 @@ jobs:
             --platform=managed \
             --allow-unauthenticated \
             --quiet
+EOF

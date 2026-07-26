@@ -1,0 +1,8 @@
+mode: set
+platform/go-gateway/main.go:27.13,29.2 1 1
+platform/go-gateway/main.go:31.60,40.2 3 1
+platform/go-gateway/main.go:42.61,50.2 3 1
+platform/go-gateway/main.go:52.13,54.16 2 0
+platform/go-gateway/main.go:54.16,56.3 1 0
+platform/go-gateway/main.go:58.2,63.75 5 0
+platform/go-gateway/main.go:63.75,65.3 1 0

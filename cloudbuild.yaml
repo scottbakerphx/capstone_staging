@@ -1,5 +1,5 @@
 steps:
-  # Step 1: Run Go unit tests on Go 1.26
+  # Step 1: Run Go unit tests using Go 1.26
   - name: 'golang:1.26-alpine'
     entrypoint: 'go'
     args: ['test', './...']
@@ -8,16 +8,16 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
-      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/platform-repo/go-gateway:$SHORT_SHA',
+      '-t', 'us-central1-docker.pkg.dev/phx-platform-lab/platform-repo/go-gateway:$SHORT_SHA',
       '.'
     ]
 
-  # Step 3: Push to Artifact Registry
+  # Step 3: Push image to Google Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'push',
-      'us-central1-docker.pkg.dev/$PROJECT_ID/platform-repo/go-gateway:$SHORT_SHA'
+      'us-central1-docker.pkg.dev/phx-platform-lab/platform-repo/go-gateway:$SHORT_SHA'
     ]
 
 images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/platform-repo/go-gateway:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/phx-platform-lab/platform-repo/go-gateway:$SHORT_SHA'
