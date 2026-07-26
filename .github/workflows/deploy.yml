@@ -25,7 +25,7 @@ jobs:
         run: go test -v -cover ./...
 
   deploy:
-    name: Build Image & Deploy to Cloud Run
+    name: Build in Shared & Deploy to PROD
     needs: test-and-build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -38,30 +38,35 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      # 1. Authenticate to Google Cloud using Central Shared WIF
+      - name: Authenticate to Google Cloud (Shared)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/265237128712/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
-          service_account: 'github-actions-sa@capstone-dev-sb26.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/1076538183807/locations/global/workloadIdentityPools/shared-github-pool/providers/shared-github-provider'
+          service_account: 'shared-ci-sa@capstone-shared-sb26.iam.gserviceaccount.com'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker for Artifact Registry
+      # 2. Authenticate Docker against Central Shared Artifact Registry
+      - name: Configure Docker for Shared Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      # 3. Build & Push Image to Central Shared Artifact Registry
       - name: Build and Push Docker Image
         run: |
-          IMAGE_URI="us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo/go-gateway:${{ github.sha }}"
-          LATEST_URI="us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo/go-gateway:latest"
+          IMAGE_URI="us-central1-docker.pkg.dev/capstone-shared-sb26/platform-repo/go-gateway-prod:${{ github.sha }}"
+          LATEST_URI="us-central1-docker.pkg.dev/capstone-shared-sb26/platform-repo/go-gateway-prod:latest"
           docker build -t $IMAGE_URI -t $LATEST_URI .
           docker push $IMAGE_URI
           docker push $LATEST_URI
 
-      - name: Deploy to Cloud Run
+      # 4. Deploy Central Image directly to PROD Cloud Run Service
+      - name: Deploy to Cloud Run (capstone-prod-sb26)
         run: |
-          gcloud run deploy go-gateway \
-            --image=us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo/go-gateway:${{ github.sha }} \
+          gcloud run deploy go-gateway-prod \
+            --image=us-central1-docker.pkg.dev/capstone-shared-sb26/platform-repo/go-gateway-prod:${{ github.sha }} \
+            --project=capstone-prod-sb26 \
             --region=us-central1 \
             --platform=managed \
             --allow-unauthenticated \
