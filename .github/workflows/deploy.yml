@@ -63,4 +63,6 @@ jobs:
           gcloud run deploy go-gateway \
             --image=us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo/go-gateway:${{ github.sha }} \
             --region=us-central1 \
-            --platform=managed
+            --platform=managed \
+            --allow-unauthenticated \
+            --quiet
