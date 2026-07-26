@@ -7,7 +7,7 @@ WORKDIR /app
 COPY go.mod ./
 RUN go mod download
 
-# Copy only Go source files explicitly to ensure safe directory copying
+# Copy Go source files explicitly to avoid recursive copy warnings
 COPY *.go ./
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server .
@@ -17,8 +17,17 @@ FROM alpine:3.19
 
 RUN apk --no-cache add ca-certificates
 
-WORKDIR /root/
+# Create a non-root user and group for security compliance
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+
+# Copy binary from builder stage and set ownership to appuser
 COPY --from=builder /app/server .
+RUN chown appuser:appgroup /app/server
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 8080
 CMD ["./server"]
