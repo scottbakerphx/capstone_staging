@@ -7,8 +7,9 @@ WORKDIR /app
 COPY go.mod ./
 RUN go mod download
 
-# Copy source code and build binary
-COPY . .
+# Copy only Go source files explicitly to ensure safe directory copying
+COPY *.go ./
+
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server .
 
 # Stage 2: Minimal runtime container
@@ -20,5 +21,4 @@ WORKDIR /root/
 COPY --from=builder /app/server .
 
 EXPOSE 8080
-
 CMD ["./server"]

@@ -1,0 +1,9 @@
+.git
+.gitignore
+.github
+*.md
+coverage.out
+coverage.html
+sonar-project.properties
+test_before_push.sh
+push_all.sh
