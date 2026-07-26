@@ -1,0 +1,66 @@
+name: CI/CD Pipeline - Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-and-build:
+    name: Run Tests & Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Run Unit Tests
+        run: go test -v -cover ./...
+
+  deploy:
+    name: Build Image & Deploy to Cloud Run
+    needs: test-and-build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/265237128712/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-sa@capstone-dev-sb26.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_URI="us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo/go-gateway:${{ github.sha }}"
+          LATEST_URI="us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo/go-gateway:latest"
+          docker build -t $IMAGE_URI -t $LATEST_URI .
+          docker push $IMAGE_URI
+          docker push $LATEST_URI
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy go-gateway \
+            --image=us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo/go-gateway:${{ github.sha }} \
+            --region=us-central1 \
+            --platform=managed
