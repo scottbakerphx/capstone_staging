@@ -1,7 +1,7 @@
 mkdir -p .github/workflows
 
-cat << 'EOF' > .github/workflows/deploy.yml
-name: CI/CD Pipeline - Deploy to Cloud Run
+python3 -c '
+content = """name: CI/CD Pipeline - Deploy to Cloud Run
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: "1.26"
 
       - name: Run Unit Tests with Coverage
         run: go test -v -coverprofile=coverage.out ./...
@@ -45,7 +45,7 @@ jobs:
   deploy:
     name: Build & Deploy to Environment
     needs: test-and-build
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
+    if: (github.ref == '\''refs/heads/main'\'' || github.ref == '\''refs/heads/master'\'') && github.event_name == '\''push'\''
     runs-on: ubuntu-latest
 
     permissions:
@@ -117,4 +117,11 @@ jobs:
             --platform=managed \
             --allow-unauthenticated \
             --quiet
-EOF
+"""
+
+# Replace tabs with 2 spaces and remove non-breaking space characters
+cleaned = content.replace("\t", "  ").replace("\u00a0", " ")
+with open(".github/workflows/deploy.yml", "w") as f:
+    f.write(cleaned)
+print("File written cleanly without tabs or bad unicode!")
+'
