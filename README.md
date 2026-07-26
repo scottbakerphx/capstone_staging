@@ -1,17 +1,25 @@
-# 🚀 Platform Engineering Microservice Gateway — DEV Environment
+# 🚀 Platform Engineering Microservice Gateway
 
-[![CI/CD Pipeline](https://github.com/scottbakerphx/capstone_dev/actions/workflows/deploy.yml/badge.svg)](https://github.com/scottbakerphx/capstone_dev/actions)
-
-An automated, cloud-native Go microservice gateway deployed to **Google Cloud Run** using modern **Platform Engineering** principles, keyless authentication, and local pre-push testing.
+An automated, cloud-native Go microservice gateway deployed to Google Cloud Run using modern Platform Engineering principles, keyless OpenID Connect (OIDC) authentication via Workload Identity Federation, and local pre-push testing.
 
 ---
 
-## 🏛️ Architecture Overview
+## 🏛️ Multi-Environment Architecture & Promotion
 
-* **Runtime:** Go 1.26 running on a minimal Alpine Linux container base (`< 20MB`).
-* **Cloud Infrastructure:** Google Cloud Run (`us-central1`) + Google Artifact Registry.
-* **Authentication:** **Workload Identity Federation (OIDC)** — Keyless CI/CD integration with GitHub Actions. Zero static GCP service account keys.
-* **Local Shift-Left Quality:** Automated `.git/hooks/pre-push` local container integration test suite.
+| Environment | Repository | Remote | Description |
+| :--- | :--- | :--- | :--- |
+| DEV | capstone_dev | origin | Active feature development & automated unit/integration tests |
+| STAGING | capstone_staging | staging | Pre-production validation and environmental parity testing |
+| PROD | capstone_prod | prod | Production environment for live traffic releases |
+
+---
+
+## 🔒 Security & Quality Controls
+
+* Runtime: Go 1.26 on a minimal Alpine Linux base container (< 20MB).
+* Cloud Infrastructure: Google Cloud Run (us-central1) + Google Artifact Registry.
+* Authentication: Keyless Workload Identity Federation (OIDC) across all 3 GitHub Action environments. Zero long-lived GCP keys stored.
+* Shift-Left Quality: Automated .git/hooks/pre-push local container integration test suite.
 
 ---
 
@@ -19,23 +27,20 @@ An automated, cloud-native Go microservice gateway deployed to **Google Cloud Ru
 
 | Endpoint | Method | Response | Description |
 | :--- | :--- | :--- | :--- |
-| `/health` | `GET` | `200 OK` (JSON) | Health probe bypasses edge proxies and returns service uptime. |
-| `/metrics` | `GET` | `200 OK` (JSON) | Basic runtime telemetry and system status. |
+| /health | GET | 200 OK (JSON) | Health probe returning uptime and service status. |
+| /metrics | GET | 200 OK (JSON) | Basic runtime telemetry and system status. |
 
 ---
 
 ## 🧪 Local Pre-Push Testing
 
-This repository enforces local agentic testing before any code reaches remote branches:
+This repository enforces local verification before code reaches any remote environment:
 
-```bash
-./test_before_push.sh
-```
+  ./test_before_push.sh
 
 ---
 
 ## 📄 Platform Documentation
 
-For full step-by-step platform execution details and session history, see:
-* [`PLATFORM_ENGINEERING_GUIDE.md`](./PLATFORM_ENGINEERING_GUIDE.md) — Comprehensive technical blueprint.
-* [`PROJECT_STATE.md`](./PROJECT_STATE.md) — Multi-environment architectural state.
+* PLATFORM_ENGINEERING_GUIDE.md — Technical blueprint and setup history.
+* PROJECT_STATE.md — Operational multi-environment state tracker.
