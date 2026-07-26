@@ -10,13 +10,37 @@ An automated, cloud-native Go microservice gateway deployed to Google Cloud Run 
 | **STAGING** | `capstone_staging` | `staging` | Pre-production validation and environmental parity testing |
 | **PROD** | `capstone_prod` | `prod` | Production environment for live traffic releases |
 
+## 🛣️ The Golden Path (Internal Developer Platform)
+
+This repository provides a frictionless "Golden Path" for developers. The infrastructure is abstracted, allowing developers to focus solely on business logic while the platform handles security, builds, and deployment.
+
+### Stage 1: The Inner Loop (Developer Workstation)
+*   **Local Go 1.26** development environment.
+*   **Cloudflare Tunnel (`cloudflared`)** for securely testing external webhooks without opening firewall ports.
+*   **Pre-Flight Checks:** Local SonarQube CLI scanning and `.git/hooks/pre-push` scripts to block bad commits before they leave the workstation.
+
+### Stage 2: Automated Quality & Security Gates
+*   Automated GitHub Actions trigger on push.
+*   Go unit testing, coverage reporting, and GoSec vulnerability scans.
+*   SonarQube quality gate enforcement.
+
+### Stage 3: Zero-Trust Artifact Delivery
+*   **Keyless Authentication:** Workload Identity Federation (WIF) via OIDC tokens (zero static GCP keys stored).
+*   **Containerization:** Minimal (< 20MB) Alpine Linux Docker builds.
+*   **Artifact Registry:** Automated, secure image tagging and pushing.
+
+### Stage 4: Progressive Multi-Environment Promotion
+*   Environment isolation via dedicated Service Accounts (`sa-capstone-dev`, `sa-capstone-staging`, `sa-capstone-prod`).
+*   Automated zero-downtime deployment to **Google Cloud Run**.
+
+---
+
 ## 🔒 Security & Quality Controls
 
-*   **Runtime:** Go 1.26 on a minimal Alpine Linux base container (< 20MB).
+*   **Runtime:** Go 1.26 on a minimal Alpine Linux base container.
 *   **Cloud Infrastructure:** Google Cloud Run (us-central1) + Google Artifact Registry.
-*   **Authentication:** Keyless Workload Identity Federation (OIDC) across all 3 GitHub Action environments. Zero long-lived GCP keys stored.
-*   **IAM Permissions:** Strictly scoped service accounts per environment, requiring explicit `roles/artifactregistry.writer`, `roles/run.admin`, and `roles/iam.serviceAccountUser` bindings.
-*   **Shift-Left Quality:** Automated `.git/hooks/pre-push` local container integration test suite.
+*   **Authentication:** Keyless Workload Identity Federation (OIDC) across all 3 GitHub Action environments. 
+*   **IAM Permissions:** Strictly scoped service accounts requiring explicit `roles/artifactregistry.writer`, `roles/run.admin`, and `roles/iam.serviceAccountUser` bindings.
 
 ## 🚦 Endpoints
 
@@ -35,22 +59,16 @@ This repository enforces local verification before code reaches any remote envir
     ./test_before_push.sh
 
 ### 2. SonarQube Local Scanning
-Before CI/CD takes over, code quality and security are analyzed locally using the SonarQube CLI (`sonar-scanner-cli`). 
-*   **Why we use it:** To catch bugs, vulnerabilities, and "Code Smells" before they consume pipeline minutes. 
-*   **Configuration:** Governed by `sonar-project.properties`, which tells the scanner exactly what to analyze, what to ignore (like vendor files), and where to find the Go coverage reports (`coverage.out`). Security "Hotspots" (like open ports) require manual approval in the Sonar dashboard.
-
-### 3. Cloudflare Tunnel (`cloudflared`)
-*   **Why we use it:** To securely expose the local Go gateway to the internet without opening router ports or messing with firewalls. This is critical for testing live external webhooks or simulating production traffic against the local Arch Linux development environment securely.
+Before CI/CD takes over, code quality and security are analyzed locally. 
+*   **Configuration:** Governed by `sonar-project.properties`. Security "Hotspots" (like open ports) require manual approval in the Sonar dashboard.
 
 ---
 
 ## 🏗️ CI/CD Pipeline & Orchestration
 
-This project utilizes isolated service accounts (`sa-capstone-dev`, `sa-capstone-staging`, `sa-capstone-prod`) to deploy code. 
-
 ### GitHub Actions vs. Cloud Build (`cloudbuild.yaml`)
-*   **GitHub Actions (`deploy.yml`):** Our primary CI/CD orchestrator. It uses OIDC to securely log into GCP, runs the Sonar/GoSec scans, builds the Docker image, and triggers the Cloud Run deployment.
-*   **Google Cloud Build (`cloudbuild.yaml`):** Included as the GCP-native alternative for container builds. **Why we use/include it:** If we ever need to bypass GitHub Actions and execute builds directly inside Google Cloud's infrastructure (e.g., for closer integration with GCP internal services or triggering builds directly from GCP source repositories), `cloudbuild.yaml` provides the exact declarative steps to build, tag, and push the image to Artifact Registry natively.
+*   **GitHub Actions (`deploy.yml`):** Our primary CI/CD orchestrator. It uses OIDC to securely log into GCP, runs scans, builds the Docker image, and triggers Cloud Run.
+*   **Google Cloud Build (`cloudbuild.yaml`):** Included as the GCP-native alternative for container builds in case we ever need to bypass GitHub Actions and execute builds directly inside Google Cloud's infrastructure.
 
 ---
 
