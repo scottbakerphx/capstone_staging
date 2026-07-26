@@ -25,7 +25,7 @@ jobs:
         run: go test -v -cover ./...
 
   deploy:
-    name: Build in Shared & Deploy to PROD
+    name: Build & Deploy to Environment
     needs: test-and-build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -38,35 +38,62 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. Authenticate to Google Cloud using Central Shared WIF
-      - name: Authenticate to Google Cloud (Shared)
+      - name: Determine Environment & GCP Configuration
+        id: env-config
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          
+          if [[ "$REPO_NAME" == *"_dev" ]]; then
+            echo "SERVICE_NAME=go-gateway-dev" >> $GITHUB_ENV
+            echo "WIF_PROVIDER=projects/265237128712/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> $GITHUB_ENV
+            echo "SA_EMAIL=github-actions-sa@capstone-dev-sb26.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "REGISTRY=us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo" >> $GITHUB_ENV
+            echo "RUN_PROJECT=capstone-dev-sb26" >> $GITHUB_ENV
+            
+          elif [[ "$REPO_NAME" == *"_staging" ]]; then
+            echo "SERVICE_NAME=go-gateway-staging" >> $GITHUB_ENV
+            echo "WIF_PROVIDER=projects/265237128712/locations/global/workloadIdentityPools/github-pool/providers/github-provider" >> $GITHUB_ENV
+            echo "SA_EMAIL=github-actions-sa@capstone-dev-sb26.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "REGISTRY=us-central1-docker.pkg.dev/capstone-dev-sb26/platform-repo" >> $GITHUB_ENV
+            echo "RUN_PROJECT=capstone-dev-sb26" >> $GITHUB_ENV
+            
+          elif [[ "$REPO_NAME" == *"_production" ]]; then
+            echo "SERVICE_NAME=go-gateway-prod" >> $GITHUB_ENV
+            echo "WIF_PROVIDER=projects/1076538183807/locations/global/workloadIdentityPools/shared-github-pool/providers/shared-github-provider" >> $GITHUB_ENV
+            echo "SA_EMAIL=shared-ci-sa@capstone-shared-sb26.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "REGISTRY=us-central1-docker.pkg.dev/capstone-shared-sb26/platform-repo" >> $GITHUB_ENV
+            echo "RUN_PROJECT=capstone-prod-sb26" >> $GITHUB_ENV
+            
+          else
+            echo "Error: Unrecognized repository name ($REPO_NAME). Must end in _dev, _staging, or _production"
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/1076538183807/locations/global/workloadIdentityPools/shared-github-pool/providers/shared-github-provider'
-          service_account: 'shared-ci-sa@capstone-shared-sb26.iam.gserviceaccount.com'
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.SA_EMAIL }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # 2. Authenticate Docker against Central Shared Artifact Registry
-      - name: Configure Docker for Shared Registry
+      - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      # 3. Build & Push Image to Central Shared Artifact Registry
       - name: Build and Push Docker Image
         run: |
-          IMAGE_URI="us-central1-docker.pkg.dev/capstone-shared-sb26/platform-repo/go-gateway-prod:${{ github.sha }}"
-          LATEST_URI="us-central1-docker.pkg.dev/capstone-shared-sb26/platform-repo/go-gateway-prod:latest"
+          IMAGE_URI="${{ env.REGISTRY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          LATEST_URI="${{ env.REGISTRY }}/${{ env.SERVICE_NAME }}:latest"
           docker build -t $IMAGE_URI -t $LATEST_URI .
           docker push $IMAGE_URI
           docker push $LATEST_URI
 
-      # 4. Deploy Central Image directly to PROD Cloud Run Service
-      - name: Deploy to Cloud Run (capstone-prod-sb26)
+      - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy go-gateway-prod \
-            --image=us-central1-docker.pkg.dev/capstone-shared-sb26/platform-repo/go-gateway-prod:${{ github.sha }} \
-            --project=capstone-prod-sb26 \
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.REGISTRY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --project=${{ env.RUN_PROJECT }} \
             --region=us-central1 \
             --platform=managed \
             --allow-unauthenticated \
